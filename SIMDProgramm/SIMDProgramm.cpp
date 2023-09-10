@@ -77,8 +77,6 @@ int main() {
         }
     }
 
-
-
     auto end_2 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float> dur2 = (end_2 - start_2) * 1000;
     std::cout << "Time: " << dur2.count() << " milliseconds\n\n";
