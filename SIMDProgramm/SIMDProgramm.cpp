@@ -2,13 +2,15 @@
 //
 
 #include <iostream>
+#include <string>
+#include<vector>
 #include <thread>
 #include <chrono>
 #include <immintrin.h>
 
 
 const int MAXTHREADS = 4;
-const int size = 4096;
+const int size = 4;
 
 __int32** Am = new __int32* [size];
 __int32** Bm = new __int32* [size];
@@ -28,7 +30,30 @@ void CalculateThread(int begin, int end) {
     }
 }
 
-void CalculateVectorThread() {
+void CalculateVectorThread(int begin, int end) {
+
+    __int32** BT = new __int32* [size];
+    for (int i = 0; i < size; i++) {
+        BT[i] = new __int32[size];
+        for (int j = 0; j < size; j++) {
+            BT[i][j] = Bm[j][i];
+        }
+    }
+
+    for (int i = begin; i < end; i++) {
+        for (int j = 0; j < size; j++) {
+            __m128i sum = _mm_setzero_si128();
+            for (int k = 0; k < size; k += 4) {
+                __m128i al = _mm_loadu_si128((__m128i*) & Am[i][k]);
+                __m128i bl = _mm_loadu_si128((__m128i*) & BT[j][k]);
+                __m128i mult = _mm_mullo_epi16(al, bl);
+                sum = _mm_add_epi32(mult, sum);
+            }
+            __m128i line_sum = _mm_hadd_epi32(_mm_hadd_epi32(sum, sum), _mm_hadd_epi32(sum, sum));
+            _mm_storeu_si32((__m128i*) & ThreadV[i][j], line_sum);
+
+        }
+    }
 }
 
 void print_matrix(int** matrix, int size) {
@@ -58,7 +83,6 @@ int main() {
             ThreadV[i][j] = 0;
         }
     }
-
 
   std::cout << "Scalar: \n";
    auto start_1 = std::chrono::high_resolution_clock::now();
@@ -109,14 +133,12 @@ int main() {
 
     std::cout << "Thread scalar: \n";
     std::thread threads[MAXTHREADS];
-        int step = size/MAXTHREADS;
+    int step = size/MAXTHREADS;
 
         auto start_3 = std::chrono::high_resolution_clock::now();
 
         for (int i = 0; i < MAXTHREADS; i++) {
-         
-                threads[i] = std::thread(CalculateThread, step*i, (step*(i+1)));
-           
+                threads[i] = std::thread(CalculateThread, step*i, (step*(i+1)));  
         }
 
         for (auto i = 0; i < MAXTHREADS; i++) {
@@ -128,27 +150,32 @@ int main() {
         std::cout << "Time: " << dur3.count() << " milliseconds\n\n";
 
         std::cout << "Thread vector: \n";
+        std::thread threadsVector[MAXTHREADS];
         auto start_4 = std::chrono::high_resolution_clock::now();
+
+        for (int i = 0; i < MAXTHREADS; i++) {
+            threadsVector[i] = std::thread(CalculateVectorThread, step * i, (step * (i + 1)));
+        }
+
+        for (auto i = 0; i < MAXTHREADS; i++) {
+            threadsVector[i].join();
+        }
 
         auto end_4 = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float> dur4 = (end_4 - start_4) * 1000;
         std::cout << "Time: " << dur4.count() << " milliseconds\n\n";
 
-
         bool equal = true;
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
-                if ((Rv[i][j] != Rs[i][j]) or (Rv[i][j] != ThreadS[i][j]))
-                equal = false;
+                if ((Rv[i][j] != Rs[i][j]) or (Rv[i][j] != ThreadS[i][j]) or (Rv[i][j] != ThreadV[i][j]))
+                    equal = false;
             }
         }
 
-        if (equal) {
-            std::cout << "Matrix is equal\n";
-        }
-        else {
-            std::cout << "Matrix not equal\n";
-        }
+       std::string Isequal;
+       Isequal = equal ? "Matrix is equal\n" : "Matrix not equal\n";
+        std::cout << Isequal;
 
 
         for (int i = 0; i < size; i++) {
