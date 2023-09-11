@@ -18,7 +18,6 @@ void Calculate(unsigned long long begin, unsigned long long end, int thread_n) {
 	for (auto i = begin; i <= end; i++)  sumA += i;
 
 	sumArr[thread_n] += sumA;
-
 }
 
 int main() {
